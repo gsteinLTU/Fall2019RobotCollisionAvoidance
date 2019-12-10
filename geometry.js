@@ -50,7 +50,7 @@ class Vector3D {
     /**
      * Returns the unit length Vector3D in the same direction as this Vector3D.
      */
-    normalized() {
+    get normalized() {
         if (this.magnitude > 0) {
             return this.scaled(1.0 / this.magnitude);
         } else {
@@ -68,7 +68,7 @@ class Ray {
         let q = new Vector3D(x2, y2, z2);
 
         // Normalize direction vector
-        this.d = q.minus(this.p).normalized();
+        this.d = q.minus(this.p).normalized;
     }
 }
 

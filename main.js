@@ -4,11 +4,12 @@ const dgram = require('dgram');
 
 // Hardcoded mapping of robots to IPs for now
 const robotIPs = {
-    10: '192.168.1.140'
+    10: '192.168.1.140',
+    13: '127.0.0.1'
 };
 
-// List of active Robots
-const robots = [];
+// Active Robots
+const robots = {};
 
 /**
  * Finds all trajectories for active robots, creating an upwards pointing
@@ -35,10 +36,53 @@ function getAllTrajectories() {
 }
 
 function commandRobot(robot, targetX, targetY) {
-    r.turn(90);
-    setTimeout(r.drive.bind(r, 30.5, 50), 2000);
+    var v1 = new Vector3D(-Math.cos(robot.theta), -Math.sin(robot.theta), 0);
+    var v2 = new Vector3D(targetX - robot.x, targetY - robot.y, 0).normalized;
+
+    var turnAngle = (Math.acos(v1.dot(v2)) * 180.0) / Math.PI;
+
+    robot.turn(turnAngle);
+
+    //setTimeout(robot.drive.bind(robot, 30.5, 50), 2000);
 }
 
-var r = new Robot(robotIPs[10]);
+// Set up UDP listener to
+var server = dgram.createSocket('udp4');
 
-commandRobot(r, 1000, 1000);
+server.on('listening', function() {
+    var local = server.address();
+    console.log('listening on ' + local.address + ':' + local.port);
+});
+
+server.on('message', function(message, remote) {
+    if (message.length < 20) {
+        console.log(
+            `invalid message ${remote.address}:
+            ${remote.port} ${message.toString('hex')}`
+        );
+    } else {
+        // Unpack message
+        let id = message.readInt32LE(0);
+        let x = message.readFloatLE(4) / 10.0;
+        let y = message.readFloatLE(8) / 10.0;
+        let theta = message.readDoubleLE(12);
+
+        // console.log(id);
+        // console.log(x);
+        // console.log(y);
+        // console.log(theta);
+
+        // Create robot object if not in list
+        if (robots[id] === undefined) {
+            robots[id] = new Robot(robotIPs[id]);
+        }
+
+        robots[id].update(x, y, theta);
+    }
+});
+
+server.bind(3434);
+
+setTimeout(() => {
+    commandRobot(robots[10], 130, 30);
+}, 3000);
