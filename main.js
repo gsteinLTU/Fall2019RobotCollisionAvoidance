@@ -48,16 +48,27 @@ function getAllTrajectories(ignoreID = -1) {
     return trajectories;
 }
 
+/**
+ * Send messages to robot to execute a turn to face target and then drive to it
+ * @param {Robot} robot
+ * @param {Number} targetX
+ * @param {Number} targetY
+ * @param {Number} speed
+ */
 function _turnAndDrive(robot, targetX, targetY, speed) {
     let v = new Vector3D(targetX - robot.x, targetY - robot.y, 0);
     let distance = v.magnitude;
     let turnAngle =
-        -90 + (-(Math.atan2(v.y, -v.x) - robot.theta) * 180.0) / Math.PI;
+        (-(Math.atan2(v.y, -v.x) + (robot.theta + Math.PI / 2)) * 180.0) /
+        Math.PI;
+
     if (turnAngle > 180) {
-        turnAngle = -360 + turnAngle;
-    } else if (turnAngle < -180) {
-        turnAngle = 360 + turnAngle;
+        turnAngle -= 360;
     }
+    if (turnAngle < -180) {
+        turnAngle += 360;
+    }
+
     console.log(`Turn angle: ${turnAngle} degrees`);
 
     // Send robot on its way
@@ -78,13 +89,15 @@ function _turnAndDrive(robot, targetX, targetY, speed) {
 
 /**
  * Tell a robot to drive to a target position
- * @param {Robot} robot
+ * @param {Number} id
  * @param {Number} targetX
  * @param {Number} targetY
  */
-function commandRobot(robot, targetX, targetY) {
+function commandRobot(id, targetX, targetY) {
+    console.log(`Robot ${id} Target Point ${targetX}, ${targetY}`);
+    let robot = robots[id];
+    console.log(robot);
     var v = new Vector3D(targetX - robot.x, targetY - robot.y, 0);
-
     var distance = v.magnitude;
     var speed = robot.maxspeed - 10;
     const currentTrajectories = getAllTrajectories(robot.id);
@@ -149,11 +162,11 @@ function commandRobot(robot, targetX, targetY) {
             tangentY - robot.y,
             0
         ).magnitude;
-        let legTime = Robot.getTravelTime(legDistance, speed) + 0.5;
+        let legTime = Robot.getTravelTime(legDistance, speed) + 3;
 
         // Calculate next leg of trip once arived at midpoint
         setTimeout(
-            commandRobot.bind(null, robot, targetX, targetY),
+            commandRobot.bind(null, id, targetX, targetY),
             legTime * 1000
         );
     }
@@ -180,13 +193,6 @@ server.on('message', function(message, remote) {
         let y = message.readFloatLE(8) / 10.0;
         let theta = message.readDoubleLE(12);
 
-        if (id === 10) {
-            // console.log(id);
-            // console.log(x);
-            // console.log(y);
-            // console.log((theta * 180) / Math.PI);
-        }
-
         // Create robot object if not in list
         if (robots[id] === undefined) {
             robots[id] = new Robot(id, robotIPs[id]);
@@ -199,6 +205,5 @@ server.on('message', function(message, remote) {
 server.bind(3435);
 
 setTimeout(() => {
-    console.log(robots[10]);
-    commandRobot(robots[10], 96, 58);
+    commandRobot(10, 96, 50);
 }, 2000);
