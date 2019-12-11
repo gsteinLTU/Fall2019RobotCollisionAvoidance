@@ -154,7 +154,7 @@ class Cylinder extends Ray {
 
         // Calculate tangent points
         let d = Math.sqrt(x * x + y * y);
-        let a = Math.asin(this.r / d);
+        let a = Math.asin((this.r * 1.1) / d);
         let b = Math.atan2(y, x);
 
         t = b - a;
