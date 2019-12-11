@@ -14,11 +14,16 @@ const robots = {};
 /**
  * Finds all trajectories for active robots, creating an upwards pointing
  * Cylinder at the current location of any stationary Robots.
+ * @param {Number} ignoreID Robot ID to not include in list.
  */
-function getAllTrajectories() {
+function getAllTrajectories(ignoreID = -1) {
     const trajectories = [];
 
-    for (robot of robots) {
+    for (robot of Object.values(robots)) {
+        if (robot.id === ignoreID) {
+            continue;
+        }
+
         // If robot has trajectories, use those
         if (robot.trajectories.length !== 0) {
             for (t of robot.trajectories) {
@@ -27,7 +32,15 @@ function getAllTrajectories() {
         } else {
             // Else assume robot is stationary
             trajectories.push(
-                new Cylinder(robot.x, robot.y, 0, robot.x, robot.y, 1, robot.r)
+                new Cylinder(
+                    robot.x,
+                    robot.y,
+                    Date.now(),
+                    robot.x,
+                    robot.y,
+                    Date.now() + 1,
+                    robot.r * 2 + 1
+                )
             );
         }
     }
@@ -35,18 +48,71 @@ function getAllTrajectories() {
     return trajectories;
 }
 
+/**
+ * Tell a robot to drive to a target position
+ * @param {Robot} robot
+ * @param {Number} targetX
+ * @param {Number} targetY
+ */
 function commandRobot(robot, targetX, targetY) {
-    var v1 = new Vector3D(-Math.cos(robot.theta), -Math.sin(robot.theta), 0);
-    var v2 = new Vector3D(targetX - robot.x, targetY - robot.y, 0).normalized;
+    var v = new Vector3D(targetX - robot.x, targetY - robot.y, 0);
 
-    var turnAngle = (Math.acos(v1.dot(v2)) * 180.0) / Math.PI;
+    var distance = v.magnitude;
+    var speed = robot.maxspeed - 10;
+    const currentTrajectories = getAllTrajectories(robot.id);
 
-    robot.turn(turnAngle);
+    console.log(v);
+    console.log(currentTrajectories);
 
-    //setTimeout(robot.drive.bind(robot, 30.5, 50), 2000);
+    // If no collisions possible, just turn and then drive
+    if (
+        !currentTrajectories.some(t => {
+            t.collides(
+                new Ray(
+                    robot.x,
+                    robot.y,
+                    Date.now() + 2,
+                    targetX,
+                    targetY,
+                    Date.now() + 2 + Robot.getTravelTime(distance, speed)
+                )
+            );
+        })
+    ) {
+        var turnAngle =
+            (-(Math.atan2(v.y, -v.x) - robot.theta) * 180.0) / Math.PI;
+
+        if (turnAngle > 180) {
+            turnAngle = -360 + turnAngle;
+        } else if (turnAngle < -180) {
+            turnAngle = 360 + turnAngle;
+        }
+
+        console.log(`Turn angle: ${turnAngle} degrees`);
+
+        // Send robot on its way
+        //robot.turn(turnAngle);
+        //setTimeout(robot.drive.bind(robot, distance, speed), 2000);
+
+        // Add trajectories so other robots will avoid this one's path
+        robot.addTrajectory(robot.x, robot.y, robot.x, robot.y, 2);
+        robot.addTrajectory(
+            robot.x,
+            robot.y,
+            targetX,
+            targetY,
+            Robot.getTravelTime(distance, speed),
+            2
+        );
+    } else {
+        // Needs augmented path to avoid collision
+        console.log(
+            'Possible collision detected, augmenting trajectory to avoid.'
+        );
+    }
 }
 
-// Set up UDP listener to
+// Set up UDP listener for robot position/orientation updates
 var server = dgram.createSocket('udp4');
 
 server.on('listening', function() {
@@ -67,22 +133,25 @@ server.on('message', function(message, remote) {
         let y = message.readFloatLE(8) / 10.0;
         let theta = message.readDoubleLE(12);
 
-        // console.log(id);
-        // console.log(x);
-        // console.log(y);
-        // console.log(theta);
+        if (id === 10) {
+            // console.log(id);
+            // console.log(x);
+            // console.log(y);
+            // console.log((theta * 180) / Math.PI);
+        }
 
         // Create robot object if not in list
         if (robots[id] === undefined) {
-            robots[id] = new Robot(robotIPs[id]);
+            robots[id] = new Robot(id, robotIPs[id]);
         }
 
         robots[id].update(x, y, theta);
     }
 });
 
-server.bind(3434);
+server.bind(3435);
 
 setTimeout(() => {
-    commandRobot(robots[10], 130, 30);
-}, 3000);
+    console.log(robots[10]);
+    commandRobot(robots[10], 96, 58);
+}, 2000);

@@ -76,9 +76,10 @@ class Ray {
  * A Cylinder in 3D space, extends infinitely in one direction
  */
 class Cylinder extends Ray {
-    constructor(x1, y1, z1, x2, y2, z2, r) {
+    constructor(x1, y1, z1, x2, y2, z2, r, h = Infinity) {
         super(x1, y1, z1, x2, y2, z2);
         this.r = r;
+        this.h = h;
     }
 
     /**
@@ -127,6 +128,10 @@ class Cylinder extends Ray {
         let t1 = (-b + d) / (2 * a);
         let t2 = (-b - d) / (2 * a);
         return [ray.p.add(ray.d.scaled(t1)), ray.p.add(ray.d.scaled(t2))];
+    }
+
+    circleTangents(x, y, z) {
+        // Find x and y a
     }
 }
 
