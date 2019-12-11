@@ -67,7 +67,7 @@ class Robot {
                 x2,
                 y2,
                 Date.now() + start + duration,
-                this.r * 2 + 1,
+                this.r * 2 + 2,
                 duration
             )
         );

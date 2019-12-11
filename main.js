@@ -39,13 +39,41 @@ function getAllTrajectories(ignoreID = -1) {
                     robot.x,
                     robot.y,
                     Date.now() + 1,
-                    robot.r * 2 + 1
+                    robot.r * 2 + 2
                 )
             );
         }
     }
 
     return trajectories;
+}
+
+function _turnAndDrive(robot, targetX, targetY, speed) {
+    let v = new Vector3D(targetX - robot.x, targetY - robot.y, 0);
+    let distance = v.magnitude;
+    let turnAngle =
+        -90 + (-(Math.atan2(v.y, -v.x) - robot.theta) * 180.0) / Math.PI;
+    if (turnAngle > 180) {
+        turnAngle = -360 + turnAngle;
+    } else if (turnAngle < -180) {
+        turnAngle = 360 + turnAngle;
+    }
+    console.log(`Turn angle: ${turnAngle} degrees`);
+
+    // Send robot on its way
+    robot.turn(turnAngle);
+    setTimeout(robot.drive.bind(robot, distance, speed), 2000);
+
+    // Add trajectories so other robots will avoid this one's path
+    robot.addTrajectory(robot.x, robot.y, robot.x, robot.y, 2);
+    robot.addTrajectory(
+        robot.x,
+        robot.y,
+        targetX,
+        targetY,
+        Robot.getTravelTime(distance, speed),
+        2
+    );
 }
 
 /**
@@ -61,53 +89,72 @@ function commandRobot(robot, targetX, targetY) {
     var speed = robot.maxspeed - 10;
     const currentTrajectories = getAllTrajectories(robot.id);
 
-    console.log(v);
-    console.log(currentTrajectories);
+    // Ray of direct trajectory
+    const testRay = new Ray(
+        robot.x,
+        robot.y,
+        Date.now() + 2,
+        targetX,
+        targetY,
+        Date.now() + 2 + Robot.getTravelTime(distance, speed)
+    );
+
+    // Array of trajectories that the test ray intersects
+    const collidingTrajectories = currentTrajectories.filter(t =>
+        t.collides(testRay)
+    );
 
     // If no collisions possible, just turn and then drive
-    if (
-        !currentTrajectories.some(t => {
-            t.collides(
-                new Ray(
-                    robot.x,
-                    robot.y,
-                    Date.now() + 2,
-                    targetX,
-                    targetY,
-                    Date.now() + 2 + Robot.getTravelTime(distance, speed)
-                )
-            );
-        })
-    ) {
-        var turnAngle =
-            (-(Math.atan2(v.y, -v.x) - robot.theta) * 180.0) / Math.PI;
-
-        if (turnAngle > 180) {
-            turnAngle = -360 + turnAngle;
-        } else if (turnAngle < -180) {
-            turnAngle = 360 + turnAngle;
-        }
-
-        console.log(`Turn angle: ${turnAngle} degrees`);
-
-        // Send robot on its way
-        //robot.turn(turnAngle);
-        //setTimeout(robot.drive.bind(robot, distance, speed), 2000);
-
-        // Add trajectories so other robots will avoid this one's path
-        robot.addTrajectory(robot.x, robot.y, robot.x, robot.y, 2);
-        robot.addTrajectory(
-            robot.x,
-            robot.y,
-            targetX,
-            targetY,
-            Robot.getTravelTime(distance, speed),
-            2
-        );
+    if (collidingTrajectories.length === 0) {
+        _turnAndDrive(robot, targetX, targetY, speed);
     } else {
         // Needs augmented path to avoid collision
         console.log(
-            'Possible collision detected, augmenting trajectory to avoid.'
+            'Probable collision detected, augmenting trajectory to avoid.'
+        );
+
+        // Find closest collision if multiple
+        if (collidingTrajectories.length > 1) {
+            collidingTrajectories.sort((a, b) => {
+                let acol = a.collidesAt(testRay);
+                let adist = min(
+                    acol[0].distance(testRay.p),
+                    acol[1].distance(testRay.p)
+                );
+                let bcol = b.collidesAt(testRay);
+                let bdist = min(
+                    bcol[0].distance(testRay.p),
+                    bcol[1].distance(testRay.p)
+                );
+                return adist - bdist;
+            });
+        }
+
+        let tangents = collidingTrajectories[0].circleTangents(
+            robot.x,
+            robot.y,
+            collidingTrajectories[0].collidesAt(testRay)[0].z
+        );
+
+        // Send robot off on first leg of journey
+        let tangentX = tangents[0].x;
+        let tangentY = tangents[0].y;
+
+        console.log(`Rerouting through ${tangentX},${tangentY}`);
+
+        _turnAndDrive(robot, tangentX, tangentY, speed);
+
+        let legDistance = new Vector3D(
+            tangentX - robot.x,
+            tangentY - robot.y,
+            0
+        ).magnitude;
+        let legTime = Robot.getTravelTime(legDistance, speed) + 0.5;
+
+        // Calculate next leg of trip once arived at midpoint
+        setTimeout(
+            commandRobot.bind(null, robot, targetX, targetY),
+            legTime * 1000
         );
     }
 }

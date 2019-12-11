@@ -57,6 +57,18 @@ class Vector3D {
             throw new Error('Cannot normalize vector with zero magnitude');
         }
     }
+
+    /**
+     * Gets distance between this vector and another
+     * @param {Vector3D} v
+     */
+    distance(v) {
+        return Math.sqrt(
+            Math.pow(v.x - this.x, 2) +
+                Math.pow(v.y - this.y, 2) +
+                Math.pow(v.z - this.z, 2)
+        );
+    }
 }
 
 /**
@@ -123,7 +135,7 @@ class Cylinder extends Ray {
             return undefined;
         }
 
-        // Use times to determine locations of collision
+        // Use each time to determine locations of collision
         let d = Math.sqrt(b * b - 4 * a * c);
         let t1 = (-b + d) / (2 * a);
         let t2 = (-b - d) / (2 * a);
@@ -131,7 +143,35 @@ class Cylinder extends Ray {
     }
 
     circleTangents(x, y, z) {
-        // Find x and y a
+        // Find x and y on cylinder at given z
+        let t = (z - this.p.z) / this.d.z;
+        let x1 = this.p.x + t * this.d.x;
+        let y1 = this.p.y + t * this.d.y;
+
+        // Move circle to origin
+        x -= x1;
+        y -= y1;
+
+        // Calculate tangent points
+        let d = Math.sqrt(x * x + y * y);
+        let a = Math.asin(this.r / d);
+        let b = Math.atan2(y, x);
+
+        t = b - a;
+        var p1 = new Vector3D(
+            this.r * Math.sin(t) + x1,
+            -this.r * Math.cos(t) + y1,
+            z
+        );
+
+        t = b + a;
+        var p2 = new Vector3D(
+            -this.r * Math.sin(t) + x1,
+            this.r * Math.cos(t) + y1,
+            z
+        );
+
+        return [p1, p2];
     }
 }
 
