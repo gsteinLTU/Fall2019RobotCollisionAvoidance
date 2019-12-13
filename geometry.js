@@ -75,12 +75,14 @@ class Vector3D {
  * A Ray in 3D space, with an origin and direction
  */
 class Ray {
-    constructor(x1, y1, z1, x2, y2, z2) {
+    constructor(x1, y1, z1, x2, y2, z2, l = 10000) {
         this.p = new Vector3D(x1, y1, z1);
         let q = new Vector3D(x2, y2, z2);
 
         // Normalize direction vector
         this.d = q.minus(this.p).normalized;
+
+        this.l = l;
     }
 }
 
@@ -88,10 +90,9 @@ class Ray {
  * A Cylinder in 3D space, extends infinitely in one direction
  */
 class Cylinder extends Ray {
-    constructor(x1, y1, z1, x2, y2, z2, r, h = Infinity) {
-        super(x1, y1, z1, x2, y2, z2);
+    constructor(x1, y1, z1, x2, y2, z2, r, h = 10000) {
+        super(x1, y1, z1, x2, y2, z2, h);
         this.r = r;
-        this.h = h;
     }
 
     /**
@@ -99,19 +100,29 @@ class Cylinder extends Ray {
      * @param {Ray} ray
      */
     collides(ray) {
-        let dot1 = ray.d.dot(this.d);
-        let deltap = ray.p.minus(this.p);
-        let dot2 = deltap.dot(this.d);
+        let collision = this.collidesAt(ray);
+        if (collision === undefined) {
+            return false;
+        }
 
-        // Solve quadratic to find intersection
-        let a = ray.d.minus(this.d.scaled(dot1));
-        let b = 2 * a.dot(deltap.minus(this.d.scaled(dot2)));
-        a = a.dot(a);
-        let c = deltap.minus(this.d.scaled(dot2));
-        c = c.dot(c) - this.r * this.r;
+        // Check that Z is in bounds
+        if (collision[0].z < ray.p.z && collision[1].z < ray.p.z) {
+            return false;
+        }
+        if (collision[0].z < this.p.z && collision[1].z < this.p.z) {
+            return false;
+        }
 
-        // If quadratic has no solutions, there is no intersection
-        return b * b >= 4 * a * c;
+        if (
+            collision[0].z - ray.p.z > ray.l + 2 ||
+            collision[1].z - ray.p.z > ray.l + 2 ||
+            collision[0].z - this.p.z > this.l + 2 ||
+            collision[1].z - this.p.z > this.l + 2
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -139,7 +150,10 @@ class Cylinder extends Ray {
         let d = Math.sqrt(b * b - 4 * a * c);
         let t1 = (-b + d) / (2 * a);
         let t2 = (-b - d) / (2 * a);
-        return [ray.p.add(ray.d.scaled(t1)), ray.p.add(ray.d.scaled(t2))];
+        let p1 = ray.p.add(ray.d.scaled(t1));
+        let p2 = ray.p.add(ray.d.scaled(t2));
+
+        return [p1, p2];
     }
 
     circleTangents(x, y, z) {
@@ -154,20 +168,21 @@ class Cylinder extends Ray {
 
         // Calculate tangent points
         let d = Math.sqrt(x * x + y * y);
-        let a = Math.asin((this.r * 1.1) / d);
+        let a = Math.asin(this.r / d);
         let b = Math.atan2(y, x);
 
         t = b - a;
+        const tempr = this.r * 1.5;
         var p1 = new Vector3D(
-            this.r * Math.sin(t) + x1,
-            -this.r * Math.cos(t) + y1,
+            tempr * Math.sin(t) + x1,
+            -tempr * Math.cos(t) + y1,
             z
         );
 
         t = b + a;
         var p2 = new Vector3D(
-            -this.r * Math.sin(t) + x1,
-            this.r * Math.cos(t) + y1,
+            -tempr * Math.sin(t) + x1,
+            tempr * Math.cos(t) + y1,
             z
         );
 

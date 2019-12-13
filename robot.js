@@ -7,7 +7,7 @@ class Robot {
         this.x = -1;
         this.y = -1;
         this.theta = -1;
-        this.r = 5;
+        this.r = 8;
         this.maxspeed = 65;
         this.trajectories = [];
         this.socket = dgram.createSocket('udp4');
@@ -67,7 +67,7 @@ class Robot {
                 x2,
                 y2,
                 Date.now() + start + duration,
-                this.r * 2 + 2,
+                this.r * 2.5,
                 duration
             )
         );
